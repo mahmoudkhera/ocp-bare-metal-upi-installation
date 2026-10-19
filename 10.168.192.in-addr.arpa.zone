@@ -1,0 +1,32 @@
+; ---------------------------------------------------------------
+; Reverse zone: 192.168.10.0/24
+; Change the serial number after EVERY edit.
+; ---------------------------------------------------------------
+$ORIGIN 10.168.192.in-addr.arpa.
+$TTL    300
+
+@       IN      SOA     lab-svc.ocp.internal. admin.ocp.internal. (
+                        1           ; Serial 
+                        3600        ; Refresh
+                        900         ; Retry
+                        604800      ; Expire
+                        300 )       ; Negative cache TTL
+
+        IN      NS      lab-svc.ocp.internal.
+
+; Helper node and load balancer (the API names are required by OpenShift)
+2       IN      PTR     api.lab.ocp.internal.
+2       IN      PTR     api-int.lab.ocp.internal.
+
+; Bootstrap node (delete after the install is done)
+200     IN      PTR     ocp-bootstrap.lab.ocp.internal.
+
+; Control plane nodes
+201     IN      PTR     ocp-cp-1.lab.ocp.internal.
+202     IN      PTR     ocp-cp-2.lab.ocp.internal.
+203     IN      PTR     ocp-cp-3.lab.ocp.internal.
+
+; Worker nodes
+211     IN      PTR     ocp-w-1.lab.ocp.internal.
+212     IN      PTR     ocp-w-2.lab.ocp.internal.
+

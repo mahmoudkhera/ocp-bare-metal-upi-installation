@@ -1,0 +1,39 @@
+; Forward zone: ocp.internal
+; Cluster name: lab    Base domain: ocp.internal
+
+$ORIGIN ocp.internal.
+$TTL    300
+
+@       IN      SOA     lab-svc.ocp.internal. yourcontact.ocp.internal. (
+                        1           ; Serial 
+                        3600        ; Refresh
+                        900         ; Retry
+                        604800      ; Expire
+                        300 )       ; Negative cache TTL
+
+        IN      NS      lab-svc.ocp.internal.
+
+; Helper server (DNS, HAProxy, web server)
+lab-svc.ocp.internal.                IN  A  192.168.10.2
+
+; Mirror registry
+registry.lab.ocp.internal.           IN  A   192.168.10.3
+
+
+; Bootstrap server (delete this record after the install is done)
+ocp-bootstrap.lab.ocp.internal.      IN  A  192.168.10.200
+
+
+; Control plane nodes
+ocp-cp-1.lab.ocp.internal.           IN  A  192.168.10.201
+ocp-cp-2.lab.ocp.internal.           IN  A  192.168.10.202
+ocp-cp-3.lab.ocp.internal.           IN  A  192.168.10.203
+
+; Worker nodes
+ocp-w-1.lab.ocp.internal.            IN  A  192.168.10.211
+ocp-w-2.lab.ocp.internal.            IN  A  192.168.10.212
+
+; Load balancer (HAProxy on lab-svc)
+api.lab.ocp.internal.                IN  A  192.168.10.2
+api-int.lab.ocp.internal.            IN  A  192.168.10.2
+*.apps.lab.ocp.internal.             IN  A  192.168.10.2
