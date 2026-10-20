@@ -25,7 +25,7 @@ variable "bridge" {
 
 variable "iso_file" {
   type        = string
-  default     = "local:iso/rhcos-live.x86_64.iso"
+  default     = "hdd_1:iso/rhcos-live-iso.x86_64.iso"
   description = "RHCOS live ISO to boot for installation, in the form <storage>:iso/<filename>. The file must already be uploaded to that storage."
 }
 
