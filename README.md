@@ -733,6 +733,55 @@ curl localhost:8080/ocp4/
 
 You should see a directory listing with bootstrap.ign, master.ign, worker.ign, rhcos and the other files.
 
+# 7.Make the ocp-infra
+Terraform creates the VMs for an OpenShift bare-metal UPI cluster on Proxmox.
+The VMs are created empty with the RHCOS live ISO attached. They are not started.
 
 
+These are general settings for every platform:
 
+- **Guest OS:** Linux, "Red Hat Enterprise Linux 9 64-bit" (or "Other Linux 64-bit").
+- **CD/DVD:** attach `rhcos-live-iso.x86_64.iso` and connect it at power on.
+- **Network:** put every node on the same internal network as the helper's internal NIC (`ens37`).
+- **No second DHCP server:** turn off any built-in DHCP on that network. The helper is the only DHCP server.
+- **MAC address:** the MAC of each VM must match its reservation in `dhcpd.conf`. Set it before the first boot.
+- **Boot order:** CD/DVD first for the install, hard disk first afterwards.
+
+
+## Files
+
+
+| File | Purpose |
+|---|---|
+| `main.tf` | Provider and VM definition |
+| `variable.tf` | Declares the variables and their defaults |
+| `terraform.tfvars` | Your values, including the list of VMs |
+> overwrite the terraform code depending on the hypervisor provider that you use
+
+
+## 1:Start the ocp-infrastructure
+
+```bash
+cd infra
+
+# 1. set the token (never put it in a file)
+export TF_VAR_pve_token='root@pam!terraform=<secret>'      # bash
+# $env:TF_VAR_pve_token = "root@pam!terraform=<secret>"    # PowerShell
+
+# 2. run Terraform
+terraform init       # download the provider
+terraform validate   # check the syntax
+terraform plan       # preview, nothing changes
+terraform apply      # type "yes" to create the VMs
+
+# 3. get the MAC addresses for the DHCP server
+terraform output mac_addresses
+```
+
+
+## 2:Remove everything
+
+```bash
+terraform plan -destroy    # preview
+terraform destroy          # deletes ALL VMs and their disks created by this config
+```

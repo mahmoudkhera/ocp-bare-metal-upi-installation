@@ -1,0 +1,50 @@
+apiVersion: v1
+
+# Base DNS domain. Combined with metadata.name it gives the cluster names:
+#   api.lab.ocp.internal      -> Kubernetes API (HAProxy :6443)
+#   api-int.lab.ocp.internal  -> internal API + Machine Config Server (:22623)
+#   *.apps.lab.ocp.internal   -> applications and web console (HAProxy :80/:443)
+# Every one of these must exist in your BIND zone.
+baseDomain: ocp.internal
+
+# Worker pool. The name must be "worker".
+compute:
+  - hyperthreading: Enabled   # use SMT threads (two per core)
+    name: worker
+    replicas: 0               # MUST be 0 for a user-provisioned install (UPI):
+                              # you boot the workers yourself, the installer creates none
+
+# Control plane pool. The name must be "master".
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  replicas: 3                 # etcd needs 3 members; must match DNS, DHCP and HAProxy
+
+metadata:
+  name: lab                   # Cluster name, the "lab" in api.lab.ocp.internal
+
+# Internal virtual networks (pods and services). They must not overlap
+# with your real lab network (192.168.10.0/24) or with each other.
+networking:
+  clusterNetwork:
+    - cidr: 10.128.0.0/14     # pool of pod IPs
+      hostPrefix: 23          # each node gets a /23 slice (about 510 pods per node)
+  networkType: OVNKubernetes  # pod network plugin;
+  serviceNetwork:
+    - 172.30.0.0/16           # pool of Service (ClusterIP) addresses
+  # machineNetwork:           # optional: uncomment if the installer picks the wrong node network
+  #   - cidr: 192.168.10.0/24
+
+# No cloud or hypervisor integration: you provide DNS, DHCP, load balancer and nodes.
+platform:
+  none: {}
+
+fips: false                   # FIPS mode cannot be changed after install
+
+# Contents of pull-secret.txt from console.redhat.com, on ONE line, in single quotes.
+# Lets the cluster download OpenShift images.
+pullSecret: '{"auths":  }'
+
+# Your PUBLIC key (~/.ssh/id_ed25519.pub). Added to the "core" user on every node
+# for troubleshooting: ssh core@<node-ip>
+sshKey: "ssh-ed25519 AAAA"
