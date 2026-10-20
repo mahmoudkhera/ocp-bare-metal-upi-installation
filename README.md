@@ -1,6 +1,90 @@
-# OpenShift Lab: Network Configuration and firewalld 
+# OCP BAREMETAL UPI LAB
 
-## 0. Configure Environmental Services
+## Overview
+
+This lab for **Bare Metal Install - User Provisioned Infrastructure (UPI)**: installing OpenShift on physical servers in a datacenter, where we prepare the infrastructure ourselves instead of letting the installer do it.
+
+With UPI we provide and configure everything OpenShift needs before the install starts:
+
+- **Network services:** DNS, DHCP, NAT and a load balancer (HAProxy), all running on one helper node.
+- **File services:** a web server for the ignition files and an NFS server for storage.
+- **Cluster nodes:** one bootstrap node, three control plane nodes and two workers.
+
+The lab shows how these pieces fit together and why each one is needed. Below you will find a comparison of the bare metal installation methods and why we chose this one.
+
+## Infrastructure
+
+![OpenShift Network Architecture](OpenShift%20Network%20Architecture.excalidraw.svg)
+
+## Types of Bare Metal Installation
+
+Before the details, these are the four types we will look at, from the most guided to the most manual:
+
+1. **Interactive:** a web page guides you and checks your servers first.
+2. **Local, agent-based:** you build a bootable ISO from config files, and it works without internet.
+3. **Automated:** the installer powers on and installs the servers itself through their BMC.
+4. **Full control:** you prepare everything yourself. This is the one we use in this lab.
+
+## Bare Metal Installation Methods
+
+Each type in detail: what it is, when to use it, and whether it suits air-gapped clusters. They differ in how much the installer does for you and how much you prepare yourself.
+
+**In this lab we will focus on the full control method (UPI).**
+
+### Interactive
+
+Docs: [Assisted Installer](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_on-premise_with_assisted_installer/installing-on-prem-assisted)
+
+You work in a web page. It gives you a discovery ISO, you boot your servers from it, and the page lists the hosts it finds. It checks them (network, DNS, disks, CPU and RAM) before it lets you start.
+
+- **When to use it:** your first datacenter cluster, or any time you want the easiest path with validation built in.
+- **Air-gapped:** no, not in the normal setup. The hosted version needs your servers to reach Red Hat services over the internet. A self-hosted Assisted Service exists, but it is extra work, so for air-gapped use the agent-based method below.
+
+### Local, Agent-Based
+
+Docs: [Agent-based Installer](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_an_on-premise_cluster_with_the_agent-based_installer/preparing-to-install-with-agent-based-installer)
+
+This is the Assisted Installer's engine, but it runs on your own machine. You write two files (`install-config.yaml` and `agent-config.yaml`), generate a bootable ISO from them, and boot every server from it (virtual media through the BMC, or a USB drive). No web UI or internet connection to Red Hat is needed, and you do not need a separate bootstrap machine because one of the servers does that job.
+
+- **When to use it:** you want a repeatable install driven by config files you can keep in Git, or your servers have no internet access.
+- **Air-gapped:** yes, this is the method built for it. You mirror the OpenShift images into your own registry and point the config at it.
+
+### Automated
+
+Docs: [Installer-provisioned infrastructure (IPI)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/installer-provisioned-infrastructure#ipi-install-overview)
+
+The installer takes control of the servers itself. It talks to each server's BMC (using IPMI or Redfish), powers it on, mounts the image and installs it, so you never boot anything by hand.
+
+- **When to use it:** many servers with working BMCs, where you want the least manual work and automatic node management afterwards.
+- **Air-gapped:** yes, with a mirror registry. It has the most prerequisites, though: BMC access to every server, a specific network layout, and a provisioner host.
+### Full control
+Docs: [User-provisioned infrastructure (UPI)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/user-provisioned-infrastructure#installing-bare-metal)
+
+You prepare everything yourself: DNS records, DHCP, the load balancer, a web server for the ignition files, a bootstrap node, then the control plane and worker nodes. In this lab, one helper node provides those services.
+
+- **When to use it:** you need full control of the datacenter network, your servers are not supported by the other methods, or you want to learn how OpenShift installs step by step.
+- **Air-gapped:** yes, it is the most flexible option. You mirror the images, add the registry details to `install-config.yaml`, and serve the files from the helper node. The cost is that it is the most manual and the easiest to get wrong.
+
+## Software installation
+
+1. Log in to the [Red Hat OpenShift Cluster Manager](https://cloud.redhat.com/openshift).
+2. Select **Create Cluster** from the **Clusters** navigation menu.
+3. Select **Red Hat OpenShift Container Platform**.
+4. Select the **Datacenter** icon.
+5. Scroll until you find **Bare Metal (x86_64)**.
+6. Select **Full Control**.
+
+   > [!note]
+   > You can go directly to the UPI page: [Install Bare Metal UPI](https://console.redhat.com/openshift/install/metal/user-provisioned)
+
+7. Download the following files:
+   - **OpenShift Installer for Linux:** the `openshift-install` tool that creates the ignition files for the nodes.
+   - **Pull secret:** lets the cluster pull the OpenShift images from Red Hat's registries.
+   - **Command Line Interface (CLI) for Linux, and for your workstation's OS:** the `oc` and `kubectl` tools used to manage the cluster.
+8. Download CentOS Stream 9 from [centos.org/download](https://www.centos.org/download/) and choose the right ISO for your architecture (for most servers, x86_64).
+---
+
+## 1. Configure Environmental Services
 
 **1: Boot the helper VM**
 
@@ -9,19 +93,19 @@
 Move the files downloaded from the Red Hat Cluster Manager site to the helper node. Create the destination folder on the helper first. Run this on the helper:
 
 ```bash
-mkdir -p ~/openshift-metal/UPI-data
+mkdir -p ~/openshift-metal/
 ```
 
 Then, on your own computer, copy the files:
 
 ```bash
-scp ~/Downloads/openshift-install-linux.tar.gz ~/Downloads/openshift-client-linux.tar.gz ~/Downloads/rhcos-metal.x86_64.raw.gz ocp@{helper_IP_address}:~/openshift-metal/UPI-data/
+scp ~/Downloads/openshift-install-linux.tar.gz ~/Downloads/openshift-client-linux.tar.gz ~/Downloads/rhcos-metal.x86_64.raw.gz ocp@{helper_IP_address}:~/openshift-metal/
 ```
 
 **3: SSH to the helper VM**
 
 ```bash
-ssh ocp@{helper_IP_address}
+ssh  ocp<or-your-machine-username>@{helper_IP_address}
 ```
 
 **4: Extract the client tools and copy them to /usr/local/bin**
@@ -52,13 +136,17 @@ Update the system so you get the latest packages for each of the services you ar
 sudo dnf update -y
 ```
 
-**8: Install Git**
+**8: Install configs **
 
 ```bash
 sudo dnf install -y git
+
+git clone https://github.com/mahmoudkhera/ocp-bare-metal-upi-installation.git openshift-metal
 ```
 
-## 1. NIC and network zones configuration
+## 2. Network Configuration and firewalld
+
+### 2.1 NIC and Network Zones Configuration
 
 **1: Find the NetworkManager connection profile**
 
@@ -132,7 +220,7 @@ nmcli connection modify ens37 connection.autoconnect yes
 
 Note: The interface must also be enabled and set to connect at power-on in VMware Workstation.
 
-## 2. Install firewalld
+### 2.2 Install firewalld
 
 Install firewalld on RHEL:
 
@@ -142,7 +230,7 @@ sudo systemctl enable --now firewalld
 sudo systemctl status firewalld
 ```
 
-## 3. Create Internal and External Zones
+### 2.3 Create Internal and External Zones
 
 - Internal zone: for the trusted OCP internal network.
 - External zone: for the network connected to the outside world.
@@ -157,7 +245,7 @@ sudo firewall-cmd --reload
 
 If either zone already exists (RHEL ships with both), you do not need to create it again.
 
-## 4. Assign Network Interfaces to Zones
+### 2.4 Assign Network Interfaces to Zones
 
 Example interface assignments:
 
@@ -184,7 +272,7 @@ sudo nmcli connection up "ens33"
 sudo nmcli connection up "ens37"
 ```
 
-## 5. Enable Masquerading
+### 2.5 Enable Masquerading
 
 Masquerading changes the source IP address of outgoing packets to the address of the outgoing interface. This allows internal hosts using private IP addresses to access external networks.
 
@@ -200,7 +288,7 @@ Enable masquerading on the internal zone:
 sudo firewall-cmd --zone=internal --add-masquerade --permanent
 ```
 
-## 6. Reload firewalld
+### 2.6 Reload firewalld
 
 Apply permanent configuration changes:
 
@@ -208,7 +296,7 @@ Apply permanent configuration changes:
 sudo firewall-cmd --reload
 ```
 
-## 7. Verify Zone Settings
+### 2.7 Verify Zone Settings
 
 Check each zone:
 
@@ -221,7 +309,7 @@ Look for the following in the relevant zone output: `masquerade: yes`
 
 Also confirm the expected interfaces are assigned to the correct zones.
 
-## 8. Enable and Verify IP Forwarding
+### 2.8 Enable and Verify IP Forwarding
 
 Masquerading and IP forwarding are different functions:
 
@@ -251,7 +339,7 @@ sudo sysctl --system
 
 Enabling masquerading does not guarantee that kernel forwarding is enabled. Verify both settings when configuring a Linux router.
 
-## 2. DNS Configuration (BIND)
+## 3. DNS Configuration (BIND)
 
 **1: Install**
 
@@ -263,17 +351,16 @@ sudo dnf install -y bind bind-utils
 
 ```bash
 sudo cp /etc/named.conf /etc/named.conf.orig
-sudo cp ~/openshift-metal/UPI-data/dns/named.conf /etc/named.conf
+sudo cp ~/openshift-metal/dns/named.conf /etc/named.conf
 ```
 
 **3: Zone files**
 
 ```bash
-sudo cp ~/openshift-metal/UPI-data/dns/ocp.internal.zone /var/named/ocp.internal.zone
-sudo cp ~/openshift-metal/UPI-data/dns/10.168.192.in-addr.arpa.zone /var/named/10.168.192.in-addr.arpa.zone
+sudo cp ~/openshift-metal/dns/ocp.internal.zone /var/named/ocp.internal.zone
+sudo cp ~/openshift-metal/dns/10.168.192.in-addr.arpa.zone /var/named/10.168.192.in-addr.arpa.zone
 sudo chown -R root:named /var/named/ocp.internal.zone /var/named/10.168.192.in-addr.arpa.zone
 sudo chmod 640 /var/named/ocp.internal.zone /var/named/10.168.192.in-addr.arpa.zone
-sudo restorecon -Rv /var/named
 ```
 
 **4: Log directory**
@@ -283,8 +370,7 @@ SELinux must allow named to write to `/var/log/named/`.
 ```bash
 sudo mkdir -p /var/log/named
 sudo chown named:named /var/log/named
-sudo semanage fcontext -a -t named_log_t "/var/log/named(/.*)?"
-sudo restorecon -Rv /var/log/named
+
 ```
 
 **5: Firewall**
@@ -303,7 +389,6 @@ sudo firewall-cmd --reload
 **6: Validate**
 
 ```bash
-sudo rndc reload
 sudo named-checkconf
 sudo named-checkzone ocp.internal /var/named/ocp.internal.zone
 sudo named-checkzone 10.168.192.in-addr.arpa /var/named/10.168.192.in-addr.arpa.zone
@@ -339,7 +424,7 @@ Confirm dig now sees the correct DNS results by using the DNS server running loc
 dig ocp.internal
 ```
 
-## 3. DHCP Server Installation
+## 4. DHCP Server Installation
 
 **1: Install**
 
@@ -370,7 +455,7 @@ sudo cp /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.orig
 Edit `dhcpd.conf` from the cloned git repo to have the correct MAC address for each host, then copy the file to the location the DHCP service uses:
 
 ```bash
-sudo cp ~/openshift-metal/UPI-data/dhcpd.conf /etc/dhcp/dhcpd.conf
+sudo cp ~/openshift-metal/dhcpd.conf /etc/dhcp/dhcpd.conf
 ```
 
 **5: Configure the firewall**
@@ -395,7 +480,7 @@ Before it will work for clients:
 - Gateway: `option routers 192.168.10.1` only works if this RHEL machine actually routes or NATs traffic. If your real router is another device, change that line to the router's IP, or clients will have no internet.
 - DNS: BIND must use the same subnet (192.168.10.0/24, DNS at 192.168.10.1). The acl, listen-on, reverse zone name (10.168.192.in-addr.arpa), and zone records all need to match. Otherwise DHCP clients will be told to use a DNS server that refuses their queries.
 
-## 4. NFS Server for the Registry
+## 5. NFS Server for the Registry
 
 You should use a mirror registry instead.
 
@@ -435,11 +520,7 @@ sudo chmod -R 777 /shares/registry
 
 The registry pod in OpenShift runs under a random user ID, not a known one, so open permissions are the simplest way to ensure it can write. This is acceptable in a lab, but it is loose. The real access control is the subnet limit in /etc/exports, so keep that tight.
 
-Allow NFS to export the directory under SELinux:
 
-```bash
-sudo setsebool -P nfs_export_all_rw on
-```
 
 **3: Export the share**
 
@@ -526,16 +607,16 @@ From a client on the lab network (any RHEL machine in 192.168.10.0/24, for examp
 
 ```bash
 sudo dnf install -y nfs-utils
-showmount -e 192.168.10.2
+showmount -e 192.168.10.1
 sudo mkdir -p /mnt/test
-sudo mount -t nfs 192.168.10.2:/shares/registry /mnt/test
+sudo mount -t nfs 192.168.10.1:/shares/registry /mnt/test
 touch /mnt/test/hello && ls -l /mnt/test
 sudo umount /mnt/test
 ```
 
 If touch works, read and write are fine. The file will be owned by nobody:nobody, which shows root_squash mapping in action.
 
-## 5. HAProxy Load Balancer
+## 6. HAProxy Load Balancer
 
 **1: Install HAProxy**
 
@@ -549,7 +630,7 @@ Back up the original, then copy the config from the cloned git repo:
 
 ```bash
 sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.orig
-sudo cp ~/openshift-metal/UPI-data/haproxy.cfg /etc/haproxy/haproxy.cfg
+sudo cp ~/openshift-metal/haproxy.cfg /etc/haproxy/haproxy.cfg
 ```
 
 **3: Configure the firewall**
@@ -586,7 +667,7 @@ sudo systemctl enable haproxy
 sudo systemctl start haproxy
 ```
 
-## 6. Apache Web Server
+## 7. Apache Web Server
 
 **1: Install Apache**
 
@@ -608,11 +689,7 @@ Check the edit:
 grep -n "^Listen" /etc/httpd/conf/httpd.conf
 ```
 
-Allow Apache to use port 8080 under SELinux:
 
-```bash
-sudo semanage port -a -t http_port_t -p tcp 8080
-```
 
 **3: Open the firewall**
 
@@ -644,7 +721,7 @@ sudo systemctl restart httpd
 curl localhost:8080
 ```
 
-## 7. Create the OpenShift Install Files
+## 8. Create the OpenShift Install Files
 
 **1: Create an install directory**
 
@@ -657,7 +734,7 @@ mkdir ~/ocp-install
 Copy the install-config.yaml included in the cloned repository to the install directory:
 
 ```bash
-cp ~/openshift-metal/UPI-data/install-config.yaml ~/ocp-install
+cp ~/openshift-metal/install-config.yaml ~/ocp-install
 ```
 
 **3: Update install-config.yaml**
@@ -733,10 +810,10 @@ curl localhost:8080/ocp4/
 
 You should see a directory listing with bootstrap.ign, master.ign, worker.ign, rhcos and the other files.
 
-# 7.Make the ocp-infra
+## 9. Make the OCP Infra
+
 Terraform creates the VMs for an OpenShift bare-metal UPI cluster on Proxmox.
 The VMs are created empty with the RHCOS live ISO attached. They are not started.
-
 
 These are general settings for every platform:
 
@@ -747,19 +824,17 @@ These are general settings for every platform:
 - **MAC address:** the MAC of each VM must match its reservation in `dhcpd.conf`. Set it before the first boot.
 - **Boot order:** CD/DVD first for the install, hard disk first afterwards.
 
-
-## Files
-
+### Files
 
 | File | Purpose |
 |---|---|
 | `main.tf` | Provider and VM definition |
 | `variable.tf` | Declares the variables and their defaults |
 | `terraform.tfvars` | Your values, including the list of VMs |
+
 > overwrite the terraform code depending on the hypervisor provider that you use
 
-
-## 1:Start the ocp-infrastructure
+### 9.1 Start the OCP Infrastructure
 
 ```bash
 cd infra
@@ -778,10 +853,150 @@ terraform apply      # type "yes" to create the VMs
 terraform output mac_addresses
 ```
 
-
-## 2:Remove everything
+### 9.2 Remove Everything
 
 ```bash
 terraform plan -destroy    # preview
 terraform destroy          # deletes ALL VMs and their disks created by this config
+```
+
+## 10. Install OpenShift (User Provisioned Install)
+
+This guide boots the bootstrap, control plane and worker nodes from the RHCOS live ISO. Each node downloads its ignition file from the helper's web server.
+
+Before you start, check from the helper that the files are served:
+
+```bash
+curl -I http://192.168.10.1:8080/ocp4/bootstrap.ign
+```
+
+You should see `HTTP/1.1 200 OK`.
+
+### 10.1 Install the Nodes
+
+Power on the **ocp-bootstrap** host and the **ocp-cp-#** hosts first. At the boot menu, press **Tab** (BIOS) or **e** (UEFI) to enter the boot configuration. Add the parameters at the end of the existing line, then press **Enter** (BIOS) or **Ctrl+X** (UEFI).
+
+#### Bootstrap node
+
+```
+coreos.inst.install_dev=/dev/sda coreos.inst.insecure=yes coreos.inst.ignition_url=http://192.168.10.1:8080/ocp4/bootstrap.ign
+
+```
+
+Or, if you waited for it to boot to the shell, use this command, then reboot when it finishes and make sure you remove the attached `.iso`:
+
+```bash
+sudo coreos-installer install /dev/sda -I http://192.168.10.1:8080/ocp4/bootstrap.ign --insecure-ignition
+```
+
+#### Each control plane node: `ocp-cp-#`
+
+```
+coreos.inst.install_dev=/dev/sda coreos.inst.insecure=yes coreos.inst.ignition_url=http://192.168.10.1:8080/ocp4/master.ign
+```
+
+Or, from the shell:
+
+```bash
+sudo coreos-installer install /dev/sda -I http://192.168.10.1:8080/ocp4/master.ign --insecure-ignition
+```
+
+#### Each worker node: `ocp-w-#`
+
+Power on the **ocp-w-#** hosts and enter the boot configuration in the same way:
+
+```
+coreos.inst.install_dev=/dev/sda coreos.inst.insecure=yes coreos.inst.ignition_url=http://192.168.10.1:8080/ocp4/worker.ign
+```
+
+Or, from the shell:
+
+```bash
+sudo coreos-installer install /dev/sda -I http://192.168.10.1:8080/ocp4/worker.ign --insecure-ignition
+```
+
+After the install finishes, the node reboots. If you used the shell command, run `sudo reboot` yourself. Remove the ISO, or set the disk first in the boot order, so the node starts from its own disk.
+
+### 10.2 Monitor the Bootstrap Process
+
+You can monitor the bootstrap process from the helper server at different log levels (`debug`, `error`, `info`):
+
+```bash
+~/openshift-metal/openshift-install --dir ~/ocp-install wait-for bootstrap-complete --log-level=debug
+```
+
+Once bootstrapping is complete, the `ocp-bootstrap` node can be removed.
+
+### 10.3 Remove the Bootstrap Node
+
+Remove all references to the `ocp-bootstrap` host from `/etc/haproxy/haproxy.cfg`. There are two entries, one in the API backend (port 6443) and one in the machine config backend (port 22623):
+
+```bash
+sudo vim /etc/haproxy/haproxy.cfg
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg
+sudo systemctl reload haproxy
+```
+
+If you are still watching the HAProxy stats page (`http://192.168.10.1:9000/stats`), you will see that the `ocp-bootstrap` host has been removed from the backends.
+
+The `ocp-bootstrap` VM can now be safely shut down and deleted from VMware Workstation, the ESXi console or Proxmox, because it is no longer needed.
+
+### 10.4 Wait for the Installation to Complete
+
+> **Important:** if you set `mastersSchedulable` to `false`, the worker nodes need to be joined to the cluster to complete the installation. The OpenShift router must be scheduled on the workers, and it is a dependency for cluster operators such as ingress, console and authentication.
+
+Collect the OpenShift console address and the `kubeadmin` credentials from the output of the `install-complete` event:
+
+```bash
+~/openshift-metal/openshift-install --dir ~/ocp-install wait-for install-complete
+```
+
+Continue to join the worker nodes to the cluster in a new terminal while this command is running.
+
+### 10.5 Join the Worker Nodes
+
+Set up the `oc` and `kubectl` clients on the helper machine:
+
+```bash
+export KUBECONFIG=~/ocp-install/auth/kubeconfig
+```
+
+Test authentication by viewing the cluster nodes:
+
+```bash
+oc get nodes
+```
+
+#### View and Approve Pending CSRs
+
+> **Note:** once you approve the first set of CSRs, additional `kubelet-serving` CSRs are created. These must be approved too. If you do not see pending requests, wait until you do.
+
+View the CSRs:
+
+```bash
+oc get csr
+```
+
+Approve one by name:
+
+```bash
+oc adm certificate approve <csr-name>
+```
+
+Approve every pending one at once:
+
+```bash
+oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs oc adm certificate approve
+```
+
+Wait for the `kubelet-serving` CSRs and approve them too, with the same command:
+
+```bash
+oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs oc adm certificate approve
+```
+
+Watch and wait for the worker nodes to join the cluster and enter a `Ready` status. This can take 5 to 10 minutes:
+
+```bash
+watch oc get nodes
 ```
