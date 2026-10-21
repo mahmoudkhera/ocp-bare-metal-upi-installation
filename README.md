@@ -659,10 +659,9 @@ It should print `Configuration file is valid`. Warnings about `option httplog` o
 
 **5: Enable and start the service**
 
-Allow HAProxy to connect to the backend ports under SELinux:
 
 ```bash
-sudo setsebool -P haproxy_connect_any 1
+
 sudo systemctl enable haproxy
 sudo systemctl start haproxy
 ```
