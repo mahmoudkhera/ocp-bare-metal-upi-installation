@@ -787,16 +787,7 @@ sudo cp -R ~/ocp-install/* /var/www/html/ocp4
 
 **7: Move the CoreOS image to the web server directory**
 
-You will type this path several times later, so shorten the name:
-
 ```bash
-sudo mv ~/rhcos-X.X.X-x86_64-metal.x86_64.raw.gz /var/www/html/ocp4/rhcos
-```
-
-**8: Change ownership and permissions**
-
-```bash
-sudo chown -R apache: /var/www/html/ocp4/
 sudo chmod 755 /var/www/html/ocp4/
 sudo restorecon -RFv /var/www/html/ocp4/
 ```
