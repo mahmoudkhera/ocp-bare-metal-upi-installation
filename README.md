@@ -1,5 +1,42 @@
 # OCP BAREMETAL UPI LAB
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Infrastructure](#infrastructure)
+- [Types of Bare Metal Installation](#types-of-bare-metal-installation)
+- [Bare Metal Installation Methods](#bare-metal-installation-methods)
+  - [Interactive](#interactive)
+  - [Local, Agent-Based](#local-agent-based)
+  - [Automated](#automated)
+  - [Full control](#full-control)
+- [Software installation](#software-installation)
+- [1. Configure Environmental Services](#1-configure-environmental-services)
+- [2. Network Configuration and firewalld](#2-network-configuration-and-firewalld)
+  - [2.1 NIC and Network Zones Configuration](#21-nic-and-network-zones-configuration)
+  - [2.2 Install firewalld](#22-install-firewalld)
+  - [2.3 Create Internal and External Zones](#23-create-internal-and-external-zones)
+  - [2.4 Assign Network Interfaces to Zones](#24-assign-network-interfaces-to-zones)
+  - [2.5 Enable Masquerading](#25-enable-masquerading)
+  - [2.6 Reload firewalld](#26-reload-firewalld)
+  - [2.7 Verify Zone Settings](#27-verify-zone-settings)
+  - [2.8 Enable and Verify IP Forwarding](#28-enable-and-verify-ip-forwarding)
+- [3. DNS Configuration (BIND)](#3-dns-configuration-bind)
+- [4. DHCP Server Installation](#4-dhcp-server-installation)
+- [5. NFS Server for the Registry](#5-nfs-server-for-the-registry)
+- [6. HAProxy Load Balancer](#6-haproxy-load-balancer)
+- [7. Apache Web Server](#7-apache-web-server)
+- [8. Create the OpenShift Install Files](#8-create-the-openshift-install-files)
+- [9. Make the OCP Infra](#9-make-the-ocp-infra)
+  - [9.1 Start the OCP Infrastructure](#91-start-the-ocp-infrastructure)
+  - [9.2 Remove Everything](#92-remove-everything)
+- [10. Install OpenShift (User Provisioned Install)](#10-install-openshift-user-provisioned-install)
+  - [10.1 Install the Nodes](#101-install-the-nodes)
+  - [10.2 Monitor the Bootstrap Process](#102-monitor-the-bootstrap-process)
+  - [10.3 Remove the Bootstrap Node](#103-remove-the-bootstrap-node)
+  - [10.4 Wait for the Installation to Complete](#104-wait-for-the-installation-to-complete)
+  - [10.5 Join the Worker Nodes](#105-join-the-worker-nodes)
+
 ## Overview
 
 This lab for **Bare Metal Install - User Provisioned Infrastructure (UPI)**: installing OpenShift on physical servers in a datacenter, where we prepare the infrastructure ourselves instead of letting the installer do it.
@@ -57,7 +94,9 @@ The installer takes control of the servers itself. It talks to each server's BMC
 
 - **When to use it:** many servers with working BMCs, where you want the least manual work and automatic node management afterwards.
 - **Air-gapped:** yes, with a mirror registry. It has the most prerequisites, though: BMC access to every server, a specific network layout, and a provisioner host.
+
 ### Full control
+
 Docs: [User-provisioned infrastructure (UPI)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/user-provisioned-infrastructure#installing-bare-metal)
 
 You prepare everything yourself: DNS records, DHCP, the load balancer, a web server for the ignition files, a bootstrap node, then the control plane and worker nodes. In this lab, one helper node provides those services.
@@ -82,6 +121,7 @@ You prepare everything yourself: DNS records, DHCP, the load balancer, a web ser
    - **Pull secret:** lets the cluster pull the OpenShift images from Red Hat's registries.
    - **Command Line Interface (CLI) for Linux, and for your workstation's OS:** the `oc` and `kubectl` tools used to manage the cluster.
 8. Download CentOS Stream 9 from [centos.org/download](https://www.centos.org/download/) and choose the right ISO for your architecture (for most servers, x86_64).
+
 ---
 
 ## 1. Configure Environmental Services
@@ -105,12 +145,15 @@ scp ~/Downloads/openshift-install-linux.tar.gz ~/Downloads/openshift-client-linu
 **3: SSH to the helper VM**
 
 ```bash
-ssh  ocp<or-your-machine-username>@{helper_IP_address}
+ssh ocp@{helper_IP_address}
 ```
+
+Replace `ocp` with your own username if it is different.
 
 **4: Extract the client tools and copy them to /usr/local/bin**
 
 ```bash
+cd ~/openshift-metal
 tar xvf openshift-client-linux.tar.gz
 sudo mv oc kubectl /usr/local/bin
 ```
@@ -136,12 +179,15 @@ Update the system so you get the latest packages for each of the services you ar
 sudo dnf update -y
 ```
 
-**8: Install configs **
+**8: Install Git and get the configs**
+
+`~/openshift-metal` already holds the downloaded files, and `git clone` refuses to clone into a folder that is not empty. Clone into a separate folder, then copy the configs next to the downloads:
 
 ```bash
 sudo dnf install -y git
 
-git clone https://github.com/mahmoudkhera/ocp-bare-metal-upi-installation.git openshift-metal
+git clone https://github.com/mahmoudkhera/ocp-bare-metal-upi-installation.git ~/ocp-repo
+cp -a ~/ocp-repo/. ~/openshift-metal/
 ```
 
 ## 2. Network Configuration and firewalld
@@ -364,8 +410,6 @@ sudo chmod 640 /var/named/ocp.internal.zone /var/named/10.168.192.in-addr.arpa.z
 ```
 
 **4: Log directory**
-
-SELinux must allow named to write to `/var/log/named/`.
 
 ```bash
 sudo mkdir -p /var/log/named
@@ -754,7 +798,7 @@ Tip: openshift-install deletes install-config.yaml when it creates the manifests
 Generate the Kubernetes manifest files:
 
 ```bash
-~/openshift-install create manifests --dir ~/ocp-install
+~/openshift-metal/openshift-install create manifests --dir ~/ocp-install
 ```
 
 A warning is shown about making the control plane nodes schedulable. It is up to you whether to run workloads on the control plane nodes. If you don't want to, disable it with:
@@ -768,7 +812,7 @@ Make any other custom changes you like to the core Kubernetes manifest files.
 Generate the ignition config and Kubernetes auth files:
 
 ```bash
-~/openshift-install create ignition-configs --dir ~/ocp-install/
+~/openshift-metal/openshift-install create ignition-configs --dir ~/ocp-install/
 ```
 
 **5: Create a hosting directory**
@@ -787,12 +831,14 @@ sudo cp -R ~/ocp-install/* /var/www/html/ocp4
 
 **7: Move the CoreOS image to the web server directory**
 
+You will type this path several times later, so shorten the name:
+
 ```bash
+sudo mv ~/openshift-metal/rhcos-metal.x86_64.raw.gz /var/www/html/ocp4/rhcos
 sudo chmod 755 /var/www/html/ocp4/
-sudo restorecon -RFv /var/www/html/ocp4/
 ```
 
-**9: Confirm the files are served by Apache**
+**8: Confirm the files are served by Apache**
 
 ```bash
 curl localhost:8080/ocp4/
@@ -825,6 +871,8 @@ These are general settings for every platform:
 > overwrite the terraform code depending on the hypervisor provider that you use
 
 ### 9.1 Start the OCP Infrastructure
+
+Run these commands on the machine that has Terraform installed and can reach the Proxmox API (not on the helper node), from the repository folder:
 
 ```bash
 cd infra
