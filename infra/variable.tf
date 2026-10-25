@@ -1,8 +1,7 @@
 variable "pve_token" {
   type        = string
   sensitive   = true
-  description = "Proxmox API token in the form user@realm!tokenid=secret (for example root@pam!terraform=xxxx)"
-  default="root@pam!terraform=xxxx"
+  description = "Proxmox API token in the form user@realm!tokenid=secret (for example root@pam!terraform=xxxx). No default on purpose: pass it with TF_VAR_pve_token and never commit it."
 }
 
 variable "pve_endpoint" {
