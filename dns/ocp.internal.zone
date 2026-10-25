@@ -14,7 +14,7 @@ $TTL    300
         IN      NS      lab-svc.ocp.internal.
 
 ; Helper server (DNS, HAProxy, web server)
-lab-svc.ocp.internal.                IN  A  192.168.10.2
+lab-svc.ocp.internal.                IN  A  192.168.10.1
 
 ; Mirror registry
 registry.lab.ocp.internal.           IN  A   192.168.10.3
@@ -34,6 +34,6 @@ ocp-w-1.lab.ocp.internal.            IN  A  192.168.10.211
 ocp-w-2.lab.ocp.internal.            IN  A  192.168.10.212
 
 ; Load balancer (HAProxy on lab-svc)
-api.lab.ocp.internal.                IN  A  192.168.10.2
-api-int.lab.ocp.internal.            IN  A  192.168.10.2
-*.apps.lab.ocp.internal.             IN  A  192.168.10.2
+api.lab.ocp.internal.                IN  A  192.168.10.1
+api-int.lab.ocp.internal.            IN  A  192.168.10.1
+*.apps.lab.ocp.internal.             IN  A  192.168.10.1
