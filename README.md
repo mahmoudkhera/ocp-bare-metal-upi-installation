@@ -46,8 +46,11 @@
 - [12. Contributing](#12-contributing)
   - [12.1 Not Implemented](#121-not-implemented)
   - [12.2 How to Contribute](#122-how-to-contribute)
+- [13. References](#13-references)
 
 ## Overview
+
+> This lab is adapted from Ryan Hay's video and repository on installing OpenShift 4 on bare metal (UPI), updated for a modern OpenShift release. See [13. References](#13-references).
 
 This lab for **Bare Metal Install - User Provisioned Infrastructure (UPI)**: installing OpenShift on physical servers in a datacenter, where we prepare the infrastructure ourselves instead of letting the installer do it.
 
@@ -1110,6 +1113,21 @@ Ideas for anyone who wants to take them on (these are suggestions and have not b
 
 - **Mirror registry:** run a registry (for example the Red Hat mirror registry or `registry:2`) on the helper or a separate VM, mirror the OpenShift release images into it, and point `install-config.yaml` at it (`imageContentSources` and `additionalTrustBundle`). This also makes the nodes install faster on a slow internet line and enables disconnected installs.
 - **NFS storage for the image registry:** export a directory (section 5), create a persistent volume and claim for it, and configure the cluster image registry to use that claim.
+
+## 13. References
+
+This lab is based on the work of **Ryan Hay**. His video and repository were the starting point, and this project adapts and extends them for a modern OpenShift installation.
+
+- Video: [How to install OpenShift 4 on Bare Metal - User Provisioned Infrastructure (UPI)](https://www.youtube.com/watch?v=d03xg2PKOPg) by Ryan Hay (YouTube, 2020)
+- Repository: [ryanhay/ocp4-metal-install](https://github.com/ryanhay/ocp4-metal-install)
+- Official documentation: [Installing a cluster on bare metal, user-provisioned infrastructure (OpenShift Container Platform 4.22)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/user-provisioned-infrastructure#installing-bare-metal)
+
+### What was changed in this version
+
+- Updated for a modern release (OpenShift 4.22), using the RHCOS live ISO and its kernel arguments for the install.
+- Added Terraform files that create the virtual machines on Proxmox (section 9).
+- Reorganized the guide into numbered sections with a clickable index, and added explanations of the configuration files.
+
 
 
 
