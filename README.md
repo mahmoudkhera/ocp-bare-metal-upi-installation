@@ -36,6 +36,16 @@
   - [10.3 Remove the Bootstrap Node](#103-remove-the-bootstrap-node)
   - [10.4 Wait for the Installation to Complete](#104-wait-for-the-installation-to-complete)
   - [10.5 Join the Worker Nodes](#105-join-the-worker-nodes)
+- [11. Open the Console from a Browser (Linux)](#11-open-the-console-from-a-browser-linux)
+  - [11.1 Prepare the Helper](#111-prepare-the-helper)
+  - [11.2 Map the Names to the Helper](#112-map-the-names-to-the-helper)
+  - [11.3 Test from Your Machine](#113-test-from-your-machine)
+  - [11.4 Open the Console](#114-open-the-console)
+  - [11.5 If It Does Not Open](#115-if-it-does-not-open)
+  - [11.6 Alternative: SSH SOCKS Proxy](#116-alternative-ssh-socks-proxy)
+- [12. Contributing](#12-contributing)
+  - [12.1 Not Implemented](#121-not-implemented)
+  - [12.2 How to Contribute](#122-how-to-contribute)
 
 ## Overview
 
@@ -527,6 +537,8 @@ Before it will work for clients:
 ## 5. NFS Server for the Registry
 
 You should use a mirror registry instead.
+
+> **Note:** The NFS server and the mirror registry were not added to the tested lab because of limited resources (RAM, CPU and disk). You are welcome to implement them yourself. See [12. Contributing](#12-contributing).
 
 **1: Install**
 
@@ -1038,3 +1050,48 @@ Watch and wait for the worker nodes to join the cluster and enter a `Ready` stat
 ```bash
 watch oc get nodes
 ```
+
+## 11. Open the Console from a Browser (Linux)
+
+The console is served by the OpenShift router, which chooses the application by **hostname**. So the browser must use the real names (`console-openshift-console.apps.lab.ocp.internal`, `oauth-openshift.apps.lab.ocp.internal`), and those names must resolve to the helper. Opening the console by IP address or as `localhost` does not work.
+
+The helper has two addresses. Use the one your Linux machine can reach. In this lab the helper is `192.168.100.8` on the home network, and `192.168.10.1` on the cluster network. HAProxy listens on ports 80 and 443 on both.
+
+### 11.1 Prepare the Helper
+
+Open the ports if `ufw` is active, and read the console address and password:
+
+```bash
+export KUBECONFIG=~/ocp-install/auth/kubeconfig
+oc whoami --show-console
+cat ~/ocp-install/auth/kubeadmin-password; echo
+```
+
+
+
+### 11.2 Map the Names to the Helper
+
+On your Linux machine, add the cluster names to `/etc/hosts`, with the helper's address that you can reach:
+
+```bash
+echo '192.168.100.8 console-openshift-console.apps.lab.ocp.internal oauth-openshift.apps.lab.ocp.internal api.lab.ocp.internal' | sudo tee -a /etc/hosts
+```
+
+The OAuth name is required, because the login page redirects to it.
+
+Flush the DNS cache and check the result:
+
+```bash
+sudo resolvectl flush-caches     
+getent hosts console-openshift-console.apps.lab.ocp.internal
+```
+`getent` must print `192.168.100.8`. Note that `dig` and `nslookup` do not read `/etc/hosts`, so use `getent` or `ping` to test.
+
+
+### 11.3 Open the Console
+
+1. Open `https://console-openshift-console.apps.lab.ocp.internal` in the browser.
+2. The browser warns that the certificate is not trusted (it is self-signed). Choose **Advanced**, then **Proceed**.
+3. On the login page, pick **kube:admin**.
+4. User: `kubeadmin`. Password: the one printed by `cat ~/ocp-install/auth/kubeadmin-password`.
+
