@@ -1095,3 +1095,21 @@ getent hosts console-openshift-console.apps.lab.ocp.internal
 3. On the login page, pick **kube:admin**.
 4. User: `kubeadmin`. Password: the one printed by `cat ~/ocp-install/auth/kubeadmin-password`.
 
+## 12. Contributing
+
+Contributions are welcome. Some parts of a complete setup were left out of this lab on purpose, because the resources were very limited (RAM, CPU and a spinning disk). You are welcome to implement them yourself and share the result.
+
+### 12.1 Not Implemented
+
+| Topic | Status | Reason |
+|---|---|---|
+| NFS storage for the image registry | Not part of the tested lab. Section 5 describes an NFS server setup, but it was not added to the cluster | Not enough resources |
+| Mirror registry | Not implemented | Needs extra RAM, disk and time to mirror the release images |
+
+Ideas for anyone who wants to take them on (these are suggestions and have not been tested in this lab):
+
+- **Mirror registry:** run a registry (for example the Red Hat mirror registry or `registry:2`) on the helper or a separate VM, mirror the OpenShift release images into it, and point `install-config.yaml` at it (`imageContentSources` and `additionalTrustBundle`). This also makes the nodes install faster on a slow internet line and enables disconnected installs.
+- **NFS storage for the image registry:** export a directory (section 5), create a persistent volume and claim for it, and configure the cluster image registry to use that claim.
+
+
+
